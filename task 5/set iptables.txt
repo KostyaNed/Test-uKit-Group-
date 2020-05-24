@@ -1,0 +1,47 @@
+# Настраиваем политики по умолчанию(Запретить весь остальной входящий трафик, кроме “ответного”)
+
+iptables -P INPUT DROP
+iptables -P OUTPUT ACCEPT
+iptables -P FORWARD DROP
+
+# удаляем все имеющиеся правила
+
+iptables -F
+iptables -t nat -F
+iptables -t mangle -F
+
+iptables -X
+iptables -t nat -X
+iptables -t mangle -X
+
+# Разрешить входящий трафик на портах с 9000 по 10000 ip адресов 8.9.10.11 и 12.13.14.15
+
+iptables -t filter -A INPUT -p tcp --dport 18070:18081 -s 8.9.10.11, 12.13.14.15  -j ACCEPT
+
+# Разрешить входящий трафик на портах 80 и 443 для доверенных подсетей: 91.191.183.0/24; 185.141.237.0/24; 185.165.120.0/24
+
+iptables -A INPUT -p tcp --destination-port 80 -m iprange --src-range 91.191.183.0-91.191.183.255 -j ACCEPT
+iptables -A INPUT -p tcp --destination-port 80 -m iprange --src-range 185.141.237.0-185.141.237.255 -j ACCEPT
+iptables -A INPUT -p tcp --destination-port 80 -m iprange --src-range 185.165.120.0-185.165.120.255 -j ACCEPT
+iptables -A INPUT -p tcp --destination-port 443 -m iprange --src-range 91.191.183.0-91.191.183.255 -j ACCEPT
+iptables -A INPUT -p tcp --destination-port 443 -m iprange --src-range 185.141.237.0-185.141.237.255 -j ACCEPT
+iptables -A INPUT -p tcp --destination-port 443 -m iprange --src-range 185.165.120.0-185.165.120.255 -j ACCEPT
+
+#Разрешить ping
+
+iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+iptables -A OUTPUT -p icmp --icmp-type echo-reply -j ACCEPT
+
+#проброс порта 22222 на локальный порт 22
+
+iptables -A FORWARD -i $WAN -d 22 -p tcp -m tcp --dport 22222 -j ACCEPT #разрешающее правило для доступа снаружи к внутреннему сервису
+iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 22222 -j DNAT --to 22 
+
+#включение/отключение firewall 
+systemctl start/stop iptables.service
+
+#автозагрузка при старте
+
+iptables-save > /etc/iptables.up.rules #сохранение правил в файл далее в конец файла /etc/network/interfaces дописываем
+pre-up iptables-restore < /etc/iptables.up.rules
+#далее перезагрузка
